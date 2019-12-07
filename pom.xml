@@ -40,6 +40,12 @@
 			<version>0.18</version>
 			<scope>test</scope>
 		</dependency>
+	<dependency>
+		<groupId>io.spot-next</groupId>
+		<artifactId>spot-instrumentation</artifactId>
+		<version>1.0-SNAPSHOT</version>
+		<scope>test</scope>
+	</dependency>
 
 	</dependencies>
 

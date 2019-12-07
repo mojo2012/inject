@@ -9,10 +9,17 @@ import org.junit.Test;
 import io.spotnext.inject.beans.PrototypeBean;
 import io.spotnext.inject.beans.SampleBean;
 import io.spotnext.inject.beans.SingletonService;
+import io.spotnext.inject.instrumentation.InjectionTransformer;
+import io.spotnext.instrumentation.DynamicInstrumentationLoader;
 
 
 public class ServiceLoaderTest {
 
+	static {
+		// dynamically attach java agent to jvm if not already present and add the injection transformer for compile-time injection
+		DynamicInstrumentationLoader.initialize(InjectionTransformer.class);
+	}
+	
 	@Test
 	public void testPrototype() {
 		final var prototypeBean1 = Context.instance().getBean(PrototypeBean.class);
@@ -22,16 +29,17 @@ public class ServiceLoaderTest {
 	}
 	
 	@Test
-	public void testSingleton() {
+	public void testSingletonWithPropertyInjection() {
 		final var singleton1 = Context.instance().getBean(SingletonService.class);
 		final var singleton2 = Context.instance().getBean(SingletonService.class);
 		
 		assertNotNull(singleton1);
+		assertNotNull(singleton1.getInjectedBean());
 		assertEquals(singleton1, singleton2);
 	}
 	
 	@Test
-	public void TestBeanInjection() {
+	public void TestManualBeanInjection() {
 		final var sampleBean = new  SampleBean();
 		
 		Context.instance().injectBeans(sampleBean);

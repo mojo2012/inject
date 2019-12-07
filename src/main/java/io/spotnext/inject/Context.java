@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
 
 import io.spotnext.inject.annotations.Bean;
 import io.spotnext.inject.annotations.Inject;
-import io.spotnext.inject.annotations.Priority;
+import io.spotnext.inject.annotations.Ordered;
 import io.spotnext.inject.annotations.Prototype;
 import io.spotnext.inject.annotations.Service;
 import io.spotnext.inject.annotations.Singleton;
@@ -116,7 +116,7 @@ public class Context implements Loggable {
 	}
 
 	private <T> Short getPriority(Provider<T> provider) {
-		final var priority = Optional.ofNullable(provider.type().getAnnotation(Priority.class));
+		final var priority = Optional.ofNullable(provider.type().getAnnotation(Ordered.class));
 		return priority.map(p -> p.value()).orElse((short) Short.MAX_VALUE);
 	}
 
