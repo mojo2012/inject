@@ -1,0 +1,3 @@
+io.spotnext.inject.beans.impl.Dummy1ServiceImpl
+io.spotnext.inject.beans.impl.Dummy2ServiceImpl
+io.spotnext.inject.beans.impl.SingletonServiceImpl
