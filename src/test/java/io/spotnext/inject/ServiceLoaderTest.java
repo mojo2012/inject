@@ -16,7 +16,7 @@ import io.spotnext.instrumentation.DynamicInstrumentationLoader;
 public class ServiceLoaderTest {
 
 	static {
-		// dynamically attach java agent to jvm if not already present and add the injection transformer for compile-time injection
+		// dynamically attach java agent to JVM if not already present and add the injection transformer for load-time injection
 		DynamicInstrumentationLoader.initialize(InjectionTransformer.class);
 	}
 	
@@ -30,7 +30,7 @@ public class ServiceLoaderTest {
 	
 	@Test
 	public void testSingletonWithPropertyInjection() {
-		final var singleton1 = Context.instance().getBean(SingletonService.class);
+		final var singleton1 = Context.instance().getBean("SingletonServiceImpl", SingletonService.class);
 		final var singleton2 = Context.instance().getBean(SingletonService.class);
 		
 		assertNotNull(singleton1);

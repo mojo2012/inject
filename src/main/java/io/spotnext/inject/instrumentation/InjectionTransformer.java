@@ -1,7 +1,10 @@
 package io.spotnext.inject.instrumentation;
 
 import java.security.ProtectionDomain;
+import java.util.Arrays;
 import java.util.Optional;
+
+import javax.persistence.Entity;
 
 import io.spotnext.inject.Context;
 import io.spotnext.inject.annotations.Bean;
@@ -36,7 +39,7 @@ public class InjectionTransformer extends AbstractBaseClassTransformer implement
 				if (log().isDebugEnabled()) {
 					log().debug("Adding injections to: " + clazz.getName());
 				}
-				
+
 				if (clazz.isFrozen()) {
 					try {
 						clazz.defrost();
@@ -47,7 +50,9 @@ public class InjectionTransformer extends AbstractBaseClassTransformer implement
 
 				// process fields
 				for (final CtField field : getDeclaredFields(clazz)) {
+					// ignore injections of the same kind as the current clazz
 					if (!clazz.equals(field.getDeclaringClass())) {
+						log().warn("Ignoring field '{}' with @Inject annotation as is has the same type as the containing class.");
 						continue;
 					}
 
@@ -57,9 +62,14 @@ public class InjectionTransformer extends AbstractBaseClassTransformer implement
 
 						clazz.removeField(field);
 						clazz.addField(initializedField,
-								CtField.Initializer.byExpr(String.format("io.spotnext.inject.Context.instance().getBean(%s.class)", field.getType().getName())));
+								CtField.Initializer
+										.byExpr(String.format("io.spotnext.inject.Context.instance().getBean(%s.class)", field.getType().getName())));
 					}
 				}
+
+				// mark class as already processed
+				// this is useful so that the class is not woven again during runtime in case the class has been woven during compile-time
+				addAnnotations(clazz, Arrays.asList(createAnnotation(clazz, Processed.class)));
 
 				return Optional.of(clazz);
 			} else {
@@ -68,10 +78,9 @@ public class InjectionTransformer extends AbstractBaseClassTransformer implement
 				}
 			}
 		} catch (final Exception e) {
-			log().error("Injection failed for bean of type " + clazz.getName(), e);
-
-			throw new IllegalClassTransformationException(
-					String.format("Unable to process JPA annotations for class file %s, reason: %s", clazz.getName(), e.getMessage()), e);
+			final var message = "Injection failed for bean of type " + clazz.getName();
+			log().error(message, e);
+			throw new IllegalClassTransformationException(message, e);
 		}
 
 		return Optional.empty();

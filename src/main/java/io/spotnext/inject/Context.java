@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 import io.spotnext.inject.annotations.Bean;
 import io.spotnext.inject.annotations.Inject;
 import io.spotnext.inject.annotations.Ordered;
+import io.spotnext.inject.annotations.Processed;
 import io.spotnext.inject.annotations.Prototype;
 import io.spotnext.inject.annotations.Service;
 import io.spotnext.inject.annotations.Singleton;
@@ -89,11 +90,11 @@ public class Context implements Loggable {
 				if (count > 1) {
 					final var beansStr = entry.getValue().stream()
 							.map(b -> b.type().getName())
-							.collect(Collectors.joining(", ")); 
+							.collect(Collectors.joining(", "));
 					log().warn("{} beans with the same priority {} found: {}", count, entry.getKey(), beansStr);
 				}
 			}
-			
+
 			// TODO switch to reflective constructor invocation, allowing parameter injection
 			var stream = beans.stream()
 					.sorted((s1, s2) -> getPriority(s1).compareTo(getPriority(s2)))
@@ -110,9 +111,21 @@ public class Context implements Loggable {
 				singletonCache.put(beanType, bean);
 				singletonCache.put(bean.getClass(), bean);
 			}
+
+			if (!isAlreadyInjected(bean)) {
+				injectBeans(bean);
+			}
 		}
 
 		return (T) bean;
+	}
+
+	/**
+	 * Checks if the current bean class has the @Processed annotation. If yes this means that the dependencies have already been injected during compile-time or
+	 * though a load-time-weaver.
+	 */
+	private boolean isAlreadyInjected(Object bean) {
+		return bean.getClass().getAnnotation(Processed.class) != null;
 	}
 
 	private <T> Short getPriority(Provider<T> provider) {

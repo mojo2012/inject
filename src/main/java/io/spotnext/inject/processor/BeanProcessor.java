@@ -20,6 +20,7 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.SortedSet;
@@ -36,6 +37,7 @@ import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.ErrorType;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
 import javax.lang.model.util.SimpleElementVisitor8;
@@ -136,11 +138,28 @@ public class BeanProcessor extends AbstractProcessor {
 			for (var e : roundEnv.getElementsAnnotatedWith(type)) {
 
 				final var annotationMirror = getAnnotationMirror(e, type).orNull();
-				
+
 				// TODO(gak): check for error trees?
 				TypeElement providerImplementer = (TypeElement) e;
 
-				final var providerInterfaces = providerImplementer.getInterfaces();
+				final var providerInterfaces = new ArrayList<TypeMirror>();
+				providerInterfaces.addAll(providerImplementer.getInterfaces());
+
+				var currentType = providerImplementer;
+				while (currentType != null) {
+					final var superClass = currentType.getSuperclass();
+					
+					if (!TypeKind.NONE.equals(superClass.getKind())) {
+						final var declaredSuperType = (DeclaredType) superClass;
+						final var superClassElement = (TypeElement) declaredSuperType.asElement();
+						
+						providerInterfaces.addAll(superClassElement.getInterfaces());
+						currentType = superClassElement;
+					} else {
+						currentType = null;
+					}
+				}
+
 				if (providerInterfaces.isEmpty()) {
 					error(MISSING_SERVICES_ERROR, e, annotationMirror);
 					continue;
