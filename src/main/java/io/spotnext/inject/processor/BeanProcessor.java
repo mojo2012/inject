@@ -21,9 +21,14 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import javax.annotation.processing.AbstractProcessor;
@@ -47,12 +52,6 @@ import javax.tools.Diagnostic.Kind;
 import javax.tools.FileObject;
 import javax.tools.StandardLocation;
 
-import com.google.common.base.Optional;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Sets;
-
 import io.spotnext.inject.annotations.Bean;
 import io.spotnext.inject.annotations.Prototype;
 import io.spotnext.inject.annotations.Service;
@@ -71,7 +70,7 @@ public class BeanProcessor extends AbstractProcessor {
 
 	public static final String MISSING_SERVICES_ERROR = "No service interfaces provided for element!";
 
-	public static final Set<Class<? extends Annotation>> SUPPORTED_ANNOTATIONS = ImmutableSet.of(Service.class, Singleton.class, Bean.class, Prototype.class);
+	public static final Set<Class<? extends Annotation>> SUPPORTED_ANNOTATIONS = Set.of(Service.class, Singleton.class, Bean.class, Prototype.class);
 
 	/**
 	 * Maps the class names of service provider interfaces to the class names of the concrete classes which implement them.
@@ -79,11 +78,11 @@ public class BeanProcessor extends AbstractProcessor {
 	 * For example, {@code "com.google.apphosting.LocalRpcService" ->
 	 *   "com.google.apphosting.datastore.LocalDatastoreService"}
 	 */
-	private Multimap<String, String> providers = HashMultimap.create();
+	private Map<String, List<String>> providers = new HashMap<>();
 
 	@Override
-	public ImmutableSet<String> getSupportedAnnotationTypes() {
-		return ImmutableSet.copyOf(SUPPORTED_ANNOTATIONS.stream().map(Class::getName).collect(Collectors.toSet()));
+	public Set<String> getSupportedAnnotationTypes() {
+		return Set.copyOf(SUPPORTED_ANNOTATIONS.stream().map(Class::getName).collect(Collectors.toSet()));
 	}
 
 	@Override
@@ -137,7 +136,7 @@ public class BeanProcessor extends AbstractProcessor {
 		for (final var type : SUPPORTED_ANNOTATIONS) {
 			for (var e : roundEnv.getElementsAnnotatedWith(type)) {
 
-				final var annotationMirror = getAnnotationMirror(e, type).orNull();
+				final var annotationMirror = getAnnotationMirror(e, type).orElse(null);
 
 				// TODO(gak): check for error trees?
 				TypeElement providerImplementer = (TypeElement) e;
@@ -148,11 +147,11 @@ public class BeanProcessor extends AbstractProcessor {
 				var currentType = providerImplementer;
 				while (currentType != null) {
 					final var superClass = currentType.getSuperclass();
-					
+
 					if (!TypeKind.NONE.equals(superClass.getKind())) {
 						final var declaredSuperType = (DeclaredType) superClass;
 						final var superClassElement = (TypeElement) declaredSuperType.asElement();
-						
+
 						providerInterfaces.addAll(superClassElement.getInterfaces());
 						currentType = superClassElement;
 					} else {
@@ -173,7 +172,16 @@ public class BeanProcessor extends AbstractProcessor {
 					log("provider implementer: " + providerImplementer.getQualifiedName());
 
 					if (checkImplementer(providerImplementer, providerType)) {
-						providers.put(getBinaryName(providerType), getBinaryName(providerImplementer));
+						final var key = getBinaryName(providerType);
+						var values = providers.get(key);
+						if (values == null) {
+							values = new ArrayList<>(4);
+							providers.put(key, values);
+						}
+						
+						values.add(getBinaryName(providerImplementer));
+
+						providers.put(key, values);
 					} else {
 						String message = "ServiceProviders must implement their service provider interface. "
 								+ providerImplementer.getQualifiedName() + " does not implement "
@@ -193,7 +201,7 @@ public class BeanProcessor extends AbstractProcessor {
 			String resourceFile = "META-INF/services/" + providerInterface;
 			log("Working on resource file: " + resourceFile);
 			try {
-				SortedSet<String> allServices = Sets.newTreeSet();
+				SortedSet<String> allServices = new TreeSet<>();
 				try {
 					// would like to be able to print the full path
 					// before we attempt to get the resource in case the behavior
@@ -201,6 +209,7 @@ public class BeanProcessor extends AbstractProcessor {
 					// no good way to resolve CLASS_OUTPUT without first getting a resource.
 					FileObject existingFile = filer.getResource(StandardLocation.CLASS_OUTPUT, "",
 							resourceFile);
+					
 					log("Looking for existing resource file at " + existingFile.toUri());
 					Set<String> oldServices = ServicesFiles.readServiceFile(existingFile.openInputStream());
 					log("Existing service entries: " + oldServices);
@@ -276,34 +285,6 @@ public class BeanProcessor extends AbstractProcessor {
 		return getBinaryNameImpl(typeElement, typeElement.getSimpleName() + "$" + className);
 	}
 
-	/**
-	 * Returns the contents of a {@code Class[]}-typed "value" field in a given {@code annotationMirror}.
-	 */
-	private ImmutableSet<DeclaredType> getValueFieldOfClasses(AnnotationMirror annotationMirror) {
-//		return getAnnotationValue(annotationMirror, "value")
-//				.accept(
-//						new SimpleAnnotationValueVisitor8<ImmutableSet<DeclaredType>, Void>() {
-//							@Override
-//							public ImmutableSet<DeclaredType> visitType(TypeMirror typeMirror, Void v) {
-//								// TODO(ronshapiro): class literals may not always be declared types, i.e. int.class,
-//								// int[].class
-//								return ImmutableSet.of(typeMirror.accept(DeclaredTypeVisitor.INSTANCE, null));
-//							}
-//
-//							@Override
-//							public ImmutableSet<DeclaredType> visitArray(
-//									List<? extends AnnotationValue> values, Void v) {
-//								return values
-//										.stream()
-//										.flatMap(value -> value.accept(this, null).stream())
-//										.collect(ImmutableSet.toImmutableSet());
-//							}
-//						},
-//						null);
-
-		return null;
-	}
-
 	private void log(String msg) {
 		if (processingEnv.getOptions().containsKey("debug")) {
 			processingEnv.getMessager().printMessage(Kind.NOTE, msg);
@@ -319,7 +300,7 @@ public class BeanProcessor extends AbstractProcessor {
 	}
 
 	/**
-	 * Returns an {@link AnnotationMirror} for the annotation of type {@code annotationClass} on {@code element}, or {@link Optional#absent()} if no such
+	 * Returns an {@link AnnotationMirror} for the annotation of type {@code annotationClass} on {@code element}, or {@link Optional#empty()} if no such
 	 * annotation exists. This method is a safer alternative to calling {@link Element#getAnnotation} as it avoids any interaction with annotation proxies.
 	 */
 	public static Optional<AnnotationMirror> getAnnotationMirror(Element element, Class<? extends Annotation> annotationClass) {
@@ -331,7 +312,7 @@ public class BeanProcessor extends AbstractProcessor {
 				return Optional.of(annotationMirror);
 			}
 		}
-		return Optional.absent();
+		return Optional.empty();
 	}
 
 	/**
@@ -345,32 +326,6 @@ public class BeanProcessor extends AbstractProcessor {
 	 */
 	public static TypeElement asType(Element element) {
 		return element.accept(TypeElementVisitor.INSTANCE, null);
-	}
-
-	private abstract static class CastingTypeVisitor<T> extends SimpleTypeVisitor8<T, Void> {
-		private final String label;
-
-		CastingTypeVisitor(String label) {
-			this.label = label;
-		}
-
-		@Override
-		protected T defaultAction(TypeMirror e, Void v) {
-			throw new IllegalArgumentException(e + " does not represent a " + label);
-		}
-	}
-
-	private static final class DeclaredTypeVisitor extends CastingTypeVisitor<DeclaredType> {
-		private static final DeclaredTypeVisitor INSTANCE = new DeclaredTypeVisitor();
-
-		DeclaredTypeVisitor() {
-			super("declared type");
-		}
-
-		@Override
-		public DeclaredType visitDeclared(DeclaredType type, Void ignore) {
-			return type;
-		}
 	}
 
 	private abstract static class CastingElementVisitor<T> extends SimpleElementVisitor8<T, Void> {
@@ -422,17 +377,4 @@ public class BeanProcessor extends AbstractProcessor {
 			return t.asElement();
 		}
 	};
-
-	private static final class TypeVariableVisitor extends CastingTypeVisitor<TypeVariable> {
-		private static final TypeVariableVisitor INSTANCE = new TypeVariableVisitor();
-
-		TypeVariableVisitor() {
-			super("type variable");
-		}
-
-		@Override
-		public TypeVariable visitTypeVariable(TypeVariable type, Void ignore) {
-			return type;
-		}
-	}
 }

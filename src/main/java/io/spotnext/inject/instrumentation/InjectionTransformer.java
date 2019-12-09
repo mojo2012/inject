@@ -4,9 +4,6 @@ import java.security.ProtectionDomain;
 import java.util.Arrays;
 import java.util.Optional;
 
-import javax.persistence.Entity;
-
-import io.spotnext.inject.Context;
 import io.spotnext.inject.annotations.Bean;
 import io.spotnext.inject.annotations.Inject;
 import io.spotnext.inject.annotations.Processed;

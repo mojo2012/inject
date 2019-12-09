@@ -30,7 +30,7 @@ public class Context implements Loggable {
 	private final List<Class<? extends Annotation>> singletonAnnotations = new ArrayList<>();
 	private final List<Class<? extends Annotation>> prototypeAnnotations = new ArrayList<>();
 
-	private final Map<Class, Object> singletonCache = new HashMap<>();
+	private final Map<Class<?>, Object> singletonCache = new HashMap<>();
 
 	private Context(ClassLoader contextClassloader) {
 		this.contextClassloader = contextClassloader;
