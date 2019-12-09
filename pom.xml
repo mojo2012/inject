@@ -16,11 +16,6 @@
 
 
 	<dependencies>
-		<!-- <dependency> -->
-		<!-- <groupId>com.google.guava</groupId> -->
-		<!-- <artifactId>guava</artifactId> -->
-		<!-- <version>28.1-jre</version> -->
-		<!-- </dependency> -->
 		<dependency>
 			<groupId>io.spot-next</groupId>
 			<artifactId>spot-core-support</artifactId>
