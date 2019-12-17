@@ -9,6 +9,7 @@ import org.junit.Test;
 import io.spotnext.inject.beans.PrototypeBean;
 import io.spotnext.inject.beans.SampleBean;
 import io.spotnext.inject.beans.SingletonService;
+import io.spotnext.inject.beans.impl.SingletonServiceImpl;
 import io.spotnext.inject.instrumentation.InjectionTransformer;
 import io.spotnext.instrumentation.DynamicInstrumentationLoader;
 
@@ -36,6 +37,14 @@ public class ServiceLoaderTest {
 		assertNotNull(singleton1);
 		assertNotNull(singleton1.getInjectedBean());
 		assertEquals(singleton1, singleton2);
+	}
+	
+	@Test
+	public void testGetSingletonByConcreteType() {
+		final var singleton = Context.instance().getBean(SingletonServiceImpl.class);
+		
+		assertNotNull(singleton);
+		assertEquals(SingletonServiceImpl.class, singleton.getClass());
 	}
 	
 	@Test

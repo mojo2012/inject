@@ -104,8 +104,22 @@ public class Context implements Loggable {
 				stream = stream.filter(predicate);
 			}
 
-			bean = stream.findFirst()
-					.orElseThrow(() -> new BeanException(String.format("Bean of type '%s' not found", beanType)));
+			bean = stream.findFirst().orElse(null);
+
+			// try all interfaces
+			if (bean == null) {
+				for (var iface : beanType.getInterfaces()) {
+					bean = loadBean(iface, b -> b.getClass().equals(beanType));
+					
+					if (bean != null) {
+						break;
+					}
+				}
+			}
+
+			if (bean == null) {
+				throw new BeanException(String.format("Bean of type '%s' not found", beanType));
+			}
 
 			if (isSingleton(bean)) {
 				singletonCache.put(beanType, bean);
