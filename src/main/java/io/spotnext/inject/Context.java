@@ -3,12 +3,15 @@ package io.spotnext.inject;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.ServiceLoader.Provider;
+import java.util.TreeSet;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -61,6 +64,21 @@ public class Context implements Loggable {
 	public <T> T getBean(Class<T> beanType) {
 		return loadBean(beanType, null);
 	}
+	
+	public <T> Collection<T> getBeans(Class<T> beanType) {
+		final List<Class<? extends T>> beanClasses = ServiceLoader
+				.load(beanType).stream()
+				.map(b -> b.type())
+				.collect(Collectors.toList());
+		
+		final var beans = new HashSet<T>();
+		
+		for (var bean : beanClasses) {
+			beans.add(getBean(bean));
+		}
+		
+		return beans;
+	}
 
 	public <T> T getBean(String beanName, Class<T> beanType) {
 		return loadBean(beanType, bean -> true);
@@ -91,7 +109,7 @@ public class Context implements Loggable {
 					final var beansStr = entry.getValue().stream()
 							.map(b -> b.type().getName())
 							.collect(Collectors.joining(", "));
-					log().warn("{} beans with the same priority {} found: {}", count, entry.getKey(), beansStr);
+					log().warn("{} beans implementing {} with the same priority {} found: {}", count, beanType, entry.getKey(), beansStr);
 				}
 			}
 
@@ -108,11 +126,13 @@ public class Context implements Loggable {
 
 			// try all interfaces
 			if (bean == null) {
-				for (var iface : beanType.getInterfaces()) {
-					bean = loadBean(iface, b -> b.getClass().equals(beanType));
-					
-					if (bean != null) {
-						break;
+				for (var cls : ClassUtil.getAllSuperClasses(beanType, Object.class, false, true)) {
+					for (var iface : cls.getInterfaces()) {
+						bean = loadBean(iface, b -> b.getClass().equals(beanType));
+						
+						if (bean != null && bean.getClass().equals(beanType)) {
+							break;
+						}
 					}
 				}
 			}

@@ -1,5 +1,7 @@
 package io.spotnext.inject.instrumentation;
 
+import java.io.File;
+import java.io.IOException;
 import java.security.ProtectionDomain;
 import java.util.Arrays;
 import java.util.Optional;
@@ -47,20 +49,15 @@ public class InjectionTransformer extends AbstractBaseClassTransformer implement
 
 				// process fields
 				for (final CtField field : getDeclaredFields(clazz)) {
-					// ignore injections of the same kind as the current clazz
-					if (!clazz.equals(field.getDeclaringClass())) {
-						log().warn("Ignoring field '{}' with @Inject annotation as is has the same type as the containing class.");
-						continue;
-					}
-
 					final Optional<Annotation> injectAnnotation = getAnnotation(field, Inject.class);
 					if (injectAnnotation.isPresent()) {
-						final var initializedField = new CtField(field.getType(), field.getName(), clazz);
-
+						final var fieldTypeName = field.getType().getName();
+						
+						// TODO handle collections 
+						
 						clazz.removeField(field);
-						clazz.addField(initializedField,
-								CtField.Initializer
-										.byExpr(String.format("io.spotnext.inject.Context.instance().getBean(%s.class)", field.getType().getName())));
+						clazz.addField(field, CtField.Initializer
+								.byExpr(String.format("(%s) io.spotnext.inject.Context.instance().getBean(%s.class)", fieldTypeName, fieldTypeName)));
 					}
 				}
 
@@ -81,6 +78,15 @@ public class InjectionTransformer extends AbstractBaseClassTransformer implement
 		}
 
 		return Optional.empty();
+	}
+	
+	@Override
+	protected void writeByteCodeToFile(CtClass transformedClass) {
+		try {
+			writeClass(transformedClass, new File("/tmp/" + transformedClass.getName()));
+		} catch (IOException e) {
+			logException(e);
+		}
 	}
 
 	private boolean isBean(CtClass clazz) throws IllegalClassTransformationException {
