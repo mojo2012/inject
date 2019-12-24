@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.security.ProtectionDomain;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Optional;
 
 import io.spotnext.inject.annotations.Bean;
@@ -51,13 +52,44 @@ public class InjectionTransformer extends AbstractBaseClassTransformer implement
 				for (final CtField field : getDeclaredFields(clazz)) {
 					final Optional<Annotation> injectAnnotation = getAnnotation(field, Inject.class);
 					if (injectAnnotation.isPresent()) {
-						final var fieldTypeName = field.getType().getName();
-						
-						// TODO handle collections 
-						
+						final var fieldType = field.getType();
+						final var fieldTypeName = fieldType.getName();
+
+						final var allInterfaces = new HashSet<CtClass>();
+
+						for (var superType : getAllSuperclasses(fieldType)) {
+							allInterfaces.addAll(Arrays.asList(superType.getInterfaces()));
+						}
+
+						final var collectionInterfaces = Arrays.asList("java.util.Collection", "java.util.Set", "java.util.List");
+						var collectionFieldType = (CtClass) null;
+
+						for (final var iface : allInterfaces) {
+							if (collectionInterfaces.contains(iface.getName())) {
+								collectionFieldType = iface;
+								break;
+							} else if ("java.util.Map".equals(fieldTypeName)) {
+								throw new IllegalClassTransformationException("Dependency injection into Map-field not supported");
+							}
+						}
+
 						clazz.removeField(field);
-						clazz.addField(field, CtField.Initializer
-								.byExpr(String.format("(%s) io.spotnext.inject.Context.instance().getBean(%s.class)", fieldTypeName, fieldTypeName)));
+						if (collectionFieldType != null) {
+							final var genericSignature = field.getGenericSignature();
+							final var genericType = genericSignature.substring(genericSignature.indexOf("<") + 2, genericSignature.length() - 3).replace("/",
+									".");
+							final var typeString = collectionFieldType.getName().endsWith("Set")
+									? "Set"
+									: "List";
+
+							clazz.addField(field, CtField.Initializer
+									.byExpr(String.format(
+											"io.spotnext.inject.Context.instance().getBeans(%s.class).stream().collect(java.util.stream.Collectors.to%s())",
+											genericType, typeString)));
+						} else {
+							clazz.addField(field, CtField.Initializer
+									.byExpr(String.format("(%s) io.spotnext.inject.Context.instance().getBean(%s.class)", fieldTypeName, fieldTypeName)));
+						}
 					}
 				}
 
@@ -71,7 +103,9 @@ public class InjectionTransformer extends AbstractBaseClassTransformer implement
 					log().debug("Ignoring " + clazz.getName());
 				}
 			}
-		} catch (final Exception e) {
+		} catch (
+
+		final Exception e) {
 			final var message = "Injection failed for bean of type " + clazz.getName();
 			log().error(message, e);
 			throw new IllegalClassTransformationException(message, e);
@@ -79,7 +113,7 @@ public class InjectionTransformer extends AbstractBaseClassTransformer implement
 
 		return Optional.empty();
 	}
-	
+
 	@Override
 	protected void writeByteCodeToFile(CtClass transformedClass) {
 		try {
