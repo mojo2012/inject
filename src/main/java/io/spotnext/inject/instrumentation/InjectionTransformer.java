@@ -117,7 +117,7 @@ public class InjectionTransformer extends AbstractBaseClassTransformer implement
 	@Override
 	protected void writeByteCodeToFile(CtClass transformedClass) {
 		try {
-			writeClass(transformedClass, new File("/tmp/" + transformedClass.getName()));
+			writeClass(transformedClass, new File("/tmp/" + transformedClass.getName() + ".class"));
 		} catch (IOException e) {
 			logException(e);
 		}
